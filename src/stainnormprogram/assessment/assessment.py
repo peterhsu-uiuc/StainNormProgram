@@ -1138,7 +1138,7 @@ class Assessment:
             * "color_dist": Distance between color distributions.
             * "palette": Metrics on the color palettes.
             * "gamut": Counts of out-of-gamut and in-gamut colors.
-            * "background": Distance between background color distributions.
+            * "background": Distance between background colors.
             * "structure": Analysis of structural changes (e.g., morphology changes due to normalization).
             * "constrast": Analysis of color contrast changes.
 
