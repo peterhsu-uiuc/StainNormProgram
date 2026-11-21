@@ -762,7 +762,7 @@ class SlideImage:
         raise Exception(f"Tried all available slide readers on {path} but was unsuccessful. Convert your image into a format compatible with OpenSlide, tifffile, or bioio-bioformats.")
 
     def get_tile(self, y: int, x: int, h: int, w: int) -> Tile:
-         """Get tile.
+        """Get tile.
 
         Args:
             y: int y-coordinate of the upper left corner.
