@@ -3,7 +3,7 @@ from stainnormprogram.slide import SlideImage, is_valid_extension
 import numpy as np
 import os
 
-def nnls(HE: np.ndarray, Y: np.ndarray):
+def nnls(HE: np.ndarray, Y: np.ndarray) -> np.ndarray:
     """Modified form of Lawson and Hanson non-negative least squares.
 
     Args:
@@ -46,7 +46,7 @@ def nnls(HE: np.ndarray, Y: np.ndarray):
 
     return C
 
-def get_paths_in_folder(folder_path: str):
+def get_paths_in_folder(folder_path: str) -> list[str]:
     """Helper function for getting valid image paths in a folder.
 
     Args:
@@ -94,4 +94,3 @@ def validate_json(json_path: str):
 
     if not os.path.exists(json_path):
         raise Exception(f"{json_path} does not exist.")
-        
