@@ -1,43 +1,48 @@
-from stainnormprogram.norm.style_estimation.macenko import MacenkoStyleEstimation
-from stainnormprogram.norm.background import HSVBackgroundEstimation, hsv_threshold_foreground
-from stainnormprogram.norm.translation import MacenkoTranslation
-from stainnormprogram.io.write_slide import TiledWriter
-from stainnormprogram.norm.subset import Subset
 from stainnormprogram.slide import SlideImage
+
+from stainnormprogram.norm.subset import Subset
+from stainnormprogram.norm.adjustments import Adjustment
 from stainnormprogram.norm.pipeline.pipeline import Pipeline
+from stainnormprogram.norm.background import HSVBackgroundEstimation, hsv_threshold_foreground
+from stainnormprogram.norm.style_estimation.macenko import MacenkoStyleEstimation
+from stainnormprogram.norm.translation.macenko import MacenkoTranslation
+
+from stainnormprogram.io.write_slide import TiledWriter
 
 import os
 import json
+from typing import Any
 
 import numpy as np
 
 class MacenkoPipeline(Pipeline):
 
-    def __init__(self,
-                 stain="HE",
-                 bkgd_method="tiled",
-                 bkgd_options={},
-                 style_est_mode="tiled_parallel",
-                 style_est_options={"detect_fg": True},
-                 alpha=1.0,
-                 beta=0.15,
-                 use_nnls=True,
-                 maxworkers=None,
-                 compression="zlib",
+    def __init__(
+                self,
+                stain: str = "HE",
+                bkgd_method: str = "tiled",
+                bkgd_options: dict[str, Any] = {},
+                style_est_mode: str = "tiled_parallel",
+                style_est_options: dict[str, Any] = {"detect_fg": True},
+                alpha: float = 1.0,
+                beta: float = 0.15,
+                use_nnls: bool = True,
+                maxworkers: int | None = None,
+                compression: str | None = "zlib",
                 ):
         """Create a Macenko pipeline.
 
         Args:
-            stain (str): stain type (either "HE" or "DAB")
-            bkgd_method (str): background estimation method ("thumbnail", "tiled", or "pyvips")
-            bkgd_options (dict): kwargs for background estimation
-            style_est_mode (str): style estimation mode ("tiled_parallel", "thumbnail", or "tiled")
-            style_est_options (dict): kwargs for style estimation
-            alpha (float): Macenko's alpha
-            beta (float): Macenko's beta
-            use_nnls (bool): use non-negative least squares for concentration estimations
-            maxworkers (int): max workers for file saving
-            compression (str): compression method for file saving (None, "zlib", or "jpeg")
+            stain: Stain type (either "HE" or "DAB").
+            bkgd_method: Background estimation method ("thumbnail", "tiled", or "pyvips").
+            bkgd_options: Kwargs for background estimation.
+            style_est_mode: Style estimation mode ("tiled_parallel", "thumbnail", or "tiled").
+            style_est_options: Kwargs for style estimation.
+            alpha: Macenko's alpha.
+            beta: Macenko's beta.
+            use_nnls: Use non-negative least squares for concentration estimations.
+            maxworkers: Max workers for file saving (None calculates this for you).
+            compression: Compression method for file saving (None, "zlib", or "jpeg").
         """
         super().__init__()
 
@@ -63,7 +68,16 @@ class MacenkoPipeline(Pipeline):
     def __repr__(self):
         return "MacenkoPipeline"
 
-    def calculate_style(self, slide, pre_adjustment=None):
+    def calculate_style(self, slide: SlideImage, pre_adjustment: Adjustment | None = None) -> dict[str, str | np.ndarray]:
+        """Calculate the stain style of an image.
+
+        Args:
+            slide: Slide image to calculate the style of.
+            pre_adjustment: Adjustment to be performed on the slide image before calculating the style.
+
+        Returns:
+            A dictionary containing the calculated style.
+        """
 
         slide.set_adjustment(pre_adjustment)
             
@@ -93,13 +107,30 @@ class MacenkoPipeline(Pipeline):
 
         return style
 
-    def calculate_style_average(self, mydict, pre_adjustments=None):
+    def calculate_style_average(self, slides: dict[str, SlideImage], pre_adjustments: Adjustment | dict[str, Adjustment] | None = None) -> dict[str, str | np.ndarray]:
+        """Calculate the stain style of one image or the average stain style of multiple images.
+
+        Args:
+            slides: One or more slide images to calculate the stain styles of. Key is the image ID (filename without extension) and value is the SlideImage.
+            pre_adjustments: Adjustments to be performed to the images before calculating the stain style. If dict, key is the image ID (filename without extension) and value is the Adjustment.
+
+        Returns:
+            A dictionary containing the average stain style.
+        """
+
         styles = []
 
         # Calculate the style of each image
-        for key, value in mydict.items():
+        for slide_id, slide in slides.items():
 
-            style = self.calculate_style(value)
+            pre_adjustment = None
+            if pre_adjustments is not None:
+                if isinstance(pre_adjustments, Adjustment):
+                    pre_adjustment = pre_adjustments
+                else:
+                    pre_adjustment = pre_adjustments.get(slide_id, None)
+
+            style = self.calculate_style(slide, pre_adjustment=pre_adjustment)
             styles.append(style)
 
         # Average
@@ -117,7 +148,16 @@ class MacenkoPipeline(Pipeline):
 
         return avg_style
 
-    def save_style(self, style, filename, subfolder=""):
+    def save_style(self, style: dict[str, str | np.ndarray], filename: str, subfolder: str = ""):
+        """Save the staining style to a JSON file.
+
+        Staining styles are saved to the folder from using ``set_output_dir``.
+
+        Args:
+            style: Staining style to save.
+            filename: Base name of the output file with .json.
+            subfolder: Subfolder paths to insert between the output_dir and filename (leave as an empty string if no subfolders are desired).
+        """
         output_path = os.path.join(self.output_dir, subfolder, filename)
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         if os.path.exists(output_path):
@@ -135,7 +175,16 @@ class MacenkoPipeline(Pipeline):
 
         print(f"Saved stain style to {output_path}")
 
-    def load_style(self, path, separate=False):
+    def load_style(self, path: str, separate: bool = False) -> dict[str, str | np.ndarray] | tuple[str | np.ndarray]:
+        """Load stain style.
+
+        Args:
+            path: JSON file path of the staining style to open.
+            separate: If True, return as matrix, maxC, I0 tuple. If False, return as a dictionary.
+
+        Returns:
+            Either a dictionary or tuple constaining of the matrix, maxC, and I0.
+        """
         with open(path, "r") as file:
             style = json.load(file)
         style["matrix"] = np.array(style["matrix"])
@@ -145,12 +194,24 @@ class MacenkoPipeline(Pipeline):
             return style
         return style["matrix"], style["maxC"], style["I0"]
 
-    def set_target_from_json(self, target):
+    def set_target_from_json(self, target: str):
+        """Set target style from a stain style JSON file.
+
+        Args:
+            target: JSON file path of the target stain style.
+        """
         self.target_style = self.load_style(target)
 
-    def transform_source(self, slide, source_style, pre_adjustment=None, post_adjustment=None, subfolder=""):
+    def transform_source(self, slide: SlideImage, source_style: dict[str, str | np.ndarray], pre_adjustment: Adjustment | None = None, post_adjustment: Adjustment | None = None, subfolder: str = ""):
+        """Transform the source image (i.e., perform the color transformation).
 
-        slide.set_adjustment(pre_adjustment)
+        Args:
+            slide: SlideImage to transform.
+            source_style: Dictionary containing the source stain style.
+            pre_adjustment: Adjustment to apply before transforming the source image.
+            post_adjustment: Adjustment to apply after transforming the source image.
+            subfolder: Subfolder paths to insert between the output_dir and filename (leave as an empty string if no subfolders are desired).
+        """
         
         mt = MacenkoTranslation(slide,
                                 self.target_style["matrix"],
@@ -159,6 +220,7 @@ class MacenkoPipeline(Pipeline):
                                 source_style["matrix"],
                                 source_style["maxC"],
                                 source_style["I0"],
+                                pre_adjustment=pre_adjustment,
                                 post_adjustment=post_adjustment,
                                 use_nnls=self.use_nnls,
                                )
@@ -169,6 +231,8 @@ class MacenkoPipeline(Pipeline):
         tw.write(mt.translate)
 
     def run(self):
+        """Run the pipeline.
+        """
 
         # Calculate target style if needed
         if self.target_style is None:
@@ -191,7 +255,7 @@ class MacenkoPipeline(Pipeline):
                 elif len(value.reference) > 0:
                     print("Calculating reference style...")
                     pre_adjustments = None
-                    if value.global_pre_adjustment is not None:
+                    if value.global_pre_adjustment is not None and value.global_pre_adjustment_includes_reference:
                         pre_adjustments = value.global_pre_adjustment
                     else:
                         pre_adjustments = value.reference_pre_adjustments
