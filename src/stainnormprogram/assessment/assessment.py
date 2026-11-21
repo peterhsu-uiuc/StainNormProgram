@@ -899,7 +899,7 @@ class Assessment:
         return self.plots[plot_name].make_plot(threshold=threshold, sort=sort, sort_by=sort_by, clip_ids=clip_ids, hide_ids=hide_ids)
 
 
-    def display_palette(self, ids: str | list[str], groups: str | list[str] | None = None, versions str | list[str] | None = None, reference: bool = False):
+    def display_palette(self, ids: str | list[str], groups: str | list[str] | None = None, versions: str | list[str] | None = None, reference: bool = False):
         """Display palettes.
 
         Args:
