@@ -137,7 +137,7 @@ class BackgroundComparison:
     
 class ReferenceBackground:
 
-    def __init__(self, ref_backgrounds: list[BackgroundEstimation] | BackgroundEstimation, identifier: str = None):
+    def __init__(self, ref_backgrounds: list[BackgroundEstimation] | BackgroundEstimation, identifier: str | None = None):
         """ReferenceBackground is the representative background of one or more reference images.
 
         Args:
