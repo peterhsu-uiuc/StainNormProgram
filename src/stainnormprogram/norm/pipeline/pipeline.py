@@ -1,13 +1,17 @@
 """
+Abstract class for stain normalization pipelines.
 
-Overall pipeline for normalization:
+General pipeline steps for normalization:
 1. Calculate a target style
 2. Calculate a source style
 3. Transform the source
-
 """
+from stainnormprogram.slide import SlideImage
+from stainnormprogram.norm.subset import Subset
 
-class Pipeline:
+from abc import ABC, abstractmethod
+
+class Pipeline(ABC):
 
     def __init__(self):
 
@@ -15,40 +19,43 @@ class Pipeline:
         self.source = None
 
         self.output_dir = None
-        self.save_by_subset = None
+        self.save_by_subset = True
 
-    def set_target(self, target):
+    def set_target(self, target: dict[str, SlideImage]):
         """
         Args:
-            target (dict): Key is ID and value is a path to an image.
+            target: Key is the image ID (filename without extension) and value is the SlideImage.
         """
         self.target = target
 
-    def set_target_from_json(self, target):
+    @abstractmethod
+    def set_target_from_json(self, target: str):
         """Set the target style from a JSON.
 
         Args:
-            target (str): Full path to a JSON.
+            target: Path to a JSON file containing the target style.
         """
-        raise NotImplementedError
+        pass
 
-    def set_source(self, source):
+    def set_source(self, source: dict[str, SlideImage | Subset]):
         """
         Args:
-            source (dict): Key is ID and value is a SlideImage or a Subset.
+            source: Key is the image ID (filename without extension) or subset ID. Value is the SlideImage or Subset.
         """
         self.source = source
 
+    @abstractmethod
     def run(self):
-        """Run pipeline
+        """Run the pipeline.
         """
-        raise NotImplementedError
+        pass
 
-    def set_output_dir(self, output_dir, save_by_subset=True):
+    def set_output_dir(self, output_dir: str, save_by_subset: bool = True):
         """
         Args:
-            output_dir (str): Output directory.
-            save_by_subset (bool): Within the output_dir, save each Subset into its own subfolder.
+            output_dir: Output directory.
+            save_by_subset: Within the output_dir, save each Subset into its own subfolder.
         """
         self.output_dir = output_dir
         self.save_by_subset = save_by_subset
+        
