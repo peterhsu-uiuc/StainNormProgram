@@ -1,6 +1,8 @@
 from stainnormprogram.norm.utils import nnls
 from stainnormprogram.norm.adjustments import Adjustment
 
+from collections.abc import Iterator
+
 import numpy as np
 import math
 import tifffile
@@ -52,7 +54,7 @@ class MacenkoTranslation:
         self.slide.set_adjustment(self.pre_adjustment)
         
 
-    def translate(self, return_metadata: bool = False):
+    def translate(self, return_metadata: bool = False) -> Iterator[np.ndarray | tuple[np.ndarray, dict[str, Any]]]:
         """Generator to perform translation.
 
         Some parts have been taken from https://github.com/slideflow/slideflow/blob/master/slideflow/norm/macenko.py.
