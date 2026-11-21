@@ -13,15 +13,40 @@ author = 'peterhsu-uiuc'
 # -- General configuration ---------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#general-configuration
 
-extensions = []
+extensions = [
+    'sphinx.ext.napoleon',
+    'autoapi.extension',
+]
 
 templates_path = ['_templates']
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 
-
-
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = 'alabaster'
+html_theme = "pydata_sphinx_theme"
 html_static_path = ['_static']
+
+# -- AutoAPI -----------------------------------------------------------------
+autoapi_dirs = ["../src/stainnormprogram"]
+autoapi_python_class_content = "both"
+autodoc_typehints = "both"
+
+def skip_util_classes(app, what, name, obj, skip, options):
+    if what == "attribute":
+       skip = True
+    return skip
+
+def setup(sphinx):
+   sphinx.connect("autoapi-skip-member", skip_util_classes)
+
+# -- Theme Settings -----------------------------------------------------------
+html_theme_options = {
+    "icon_links": [
+        {
+            "name": "GitHub",
+            "url": "https://github.com/peterhsu-uiuc/StainNormProgram",
+            "icon": "fa-brands fa-github",
+        }
+    ]
+}
