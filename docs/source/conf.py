@@ -28,7 +28,7 @@ html_theme = "pydata_sphinx_theme"
 html_static_path = ['_static']
 
 # -- AutoAPI -----------------------------------------------------------------
-autoapi_dirs = ["../src/stainnormprogram"]
+autoapi_dirs = ["../../src/stainnormprogram"]
 autoapi_python_class_content = "both"
 autodoc_typehints = "both"
 
