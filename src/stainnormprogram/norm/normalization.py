@@ -73,7 +73,7 @@ class Normalization:
         """Set a normalization pipeline.
 
         Available pipelines:
-        * MacenkoPipeline
+            * MacenkoPipeline
 
         Args:
             pipeline: The name of a pipeline or a Pipeline object.
@@ -124,4 +124,3 @@ class Normalization:
 
         # Run pipeline
         self.pipeline.run()
-        
