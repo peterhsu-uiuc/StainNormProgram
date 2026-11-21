@@ -1,5 +1,5 @@
-from stainnormprogram.norm.utils import nnls
 from stainnormprogram.slide import Tile
+from stainnormprogram.norm.utils import nnls
 from stainnormprogram.norm.background import hsv_threshold_foreground
 
 import math
@@ -20,18 +20,27 @@ HTX_HUE = 240.0 / 360.0 # blue
 
 class MacenkoStyleEstimation:
 
-    def __init__(self, slide, I0, stain_balancing=False, mode="tiled_parallel", alpha=1.0, beta=0.15, use_nnls=True, options={}):
-        """Construct a MacenkoStyleEstimation.
+    def __init__(self,
+                slide: SlideImage,
+                I0: np.ndarray,
+                stain_balancing: bool = False,
+                mode: str = "tiled_parallel",
+                alpha: float = 1.0,
+                beta: float = 0.15,
+                use_nnls: bool = True,
+                options: dict[str, Any] = {}
+                ):
+        """Estimate the stain style using Macenko's method.
 
         Args:
-            slide (SlideImage): slide to perform estimation on
-            I0 (np.ndarray): background intensity
-            stain_balancing (bool): whether to perform stain balancing (True is recommended for DAB)
-            mode (str): estimation mode ("tiled", "tiled_parallel", or "thumbnail")
-            alpha (float): Macenko's alpha
-            beta (float): Macenko's beta
-            use_nnls (bool): use non-negative least squares when calculating concentrations
-            options (dict): options to pass to estimation method
+            slide: Slide to perform estimation on.
+            I0: Background intensity.
+            stain_balancing: Whether to perform stain balancing (True is recommended for DAB).
+            mode: Estimation mode ("tiled", "tiled_parallel", or "thumbnail").
+            alpha: Macenko's alpha.
+            beta: Macenko's beta.
+            use_nnls: Use non-negative least squares when calculating concentrations.
+            options: Additional options to pass to the estimation methods.
         """
         self.slide = slide
         self.I0 = I0
@@ -52,6 +61,8 @@ class MacenkoStyleEstimation:
         self.maxC_avg = None
 
     def compute_matrix(self):
+        """Compute the stain matrix.
+        """
         if self.mode == "tiled_parallel":
             self.compute_tiled_parallel(quantity="matrix", **self.options)
         elif self.mode == "thumbnail":
@@ -62,6 +73,8 @@ class MacenkoStyleEstimation:
             raise Exception(f"{self.mode} is not a valid mode.")
 
     def compute_maxC(self):
+        """Compute maxC.
+        """
         if self.mode == "tiled_parallel":
             self.compute_tiled_parallel(quantity="maxC", **self.options)
         elif self.mode == "thumbnail":
@@ -71,15 +84,20 @@ class MacenkoStyleEstimation:
         else:
             raise Exception(f"{self.mode} is not a valid mode.")
 
-    def set_matrix_avg(self, matrix_avg):
+    def set_matrix_avg(self, matrix_avg: np.ndarray):
+        """Set the average stain matrix (useful if you want to just calculate maxC).
+        """
         self.matrix_avg = matrix_avg
 
     @staticmethod
-    def get_buffer_assignment(pixels):
+    def get_buffer_assignment(pixels: np.ndarray) -> np.ndarray:
         """Assign pixels to either the hematoxylin (False) or DAB (True) buffers.
 
         Args:
-            pixels (np.ndarray): (N,3) in HSV
+            pixels: (N,3) in HSV
+
+        Returns:
+            A np.ndarray (N,) where hematoyxlin pixels are False and DAB pixels are True.
         """
         hues = pixels[:,0]
 
@@ -92,7 +110,18 @@ class MacenkoStyleEstimation:
         return dab_dists < htx_dists
 
     @staticmethod
-    def convert_od_and_filter(tile, I0, beta, return_mask=False):
+    def convert_od_and_filter(tile: Tile, I0: np.ndarray, beta: float, return_mask: bool = False) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+        """Convert RGB pixels into optical density (OD) pixels, then filter out pixels using the beta threshold.
+
+        Args:
+            tile: Tile image.
+            I0: Initial intensity.
+            beta: Macenko's beta.
+            return_mask: Return the filter mask. True pixels in the mask correspond to pixels that were accepted.
+
+        Returns:
+            A np.ndarray with accepted OD pixels, along with a np.ndarray bool mask if return_mask is True.
+        """
 
         tile_od = tile.od(I0).reshape(-1,3)
 
@@ -108,9 +137,17 @@ class MacenkoStyleEstimation:
         return filtered
 
     @staticmethod
-    def svd(ODhat, alpha):
-        """
-        From Slideflow
+    def svd(ODhat: np.ndarray, alpha: float) -> np.ndarray:
+        """Compute Macenko's singular value decomposition.
+
+        Code taken from https://github.com/slideflow/slideflow/blob/master/slideflow/norm/macenko.py.
+
+        Args:
+            ODhat: Filtered OD pixel values.
+            alpha: Macenko's alpha.
+
+        Returns:
+            A np.ndarray representing the stain matrix.
         """
 
         eigvals, eigvecs = np.linalg.eigh(np.cov(ODhat.T))
@@ -132,7 +169,16 @@ class MacenkoStyleEstimation:
 
         return matrix
 
-    def get_thumbnail_pixels(self, height=4096, smooth=True):
+    def get_thumbnail_pixels(self, height: int = 4096, smooth: bool = True) -> np.ndarray:
+        """Get filtered OD pixels from the thumbnail image.
+
+        Args:
+            height: Max height of the thumbnail.
+            smooth: Allow for interpolation that involves pixel smoothing.
+
+        Returns:
+            A np.ndarray with accepted OD pixels.
+        """
         image = self.slide.get_thumbnail(height=height, smooth=smooth)
         tile = Tile(image)
         filtered = self.convert_od_and_filter(tile, self.I0, self.beta)
@@ -142,11 +188,23 @@ class MacenkoStyleEstimation:
 
         return filtered
 
-    def compute_matrix_thumbnail(self, height=4096, smooth=True, **kwargs):
+    def compute_matrix_thumbnail(self, height: int = 4096, smooth: bool = True, **kwargs):
+        """Compute the stain matrix from a thumbnail of the whole slide image.
+
+        Args:
+            height: Max height of the thumbnail.
+            smooth: Allow for interpolation that involves pixel smoothing.
+        """
         filtered = self.get_thumbnail_pixels(height=height, smooth=smooth)
         self.matrix_avg = self.svd(filtered, self.alpha)
 
-    def compute_maxC_thumbnail(self, height=4096, smooth=True, **kwargs):
+    def compute_maxC_thumbnail(self, height: int = 4096, smooth: bool = True, **kwargs):
+        """Compute maxC from a thumbnail of the whole slide image.
+
+        Args:
+            height: Max height of the thumbnail.
+            smooth: Allow for interpolation that involves pixel smoothing.
+        """
 
         filtered = self.get_thumbnail_pixels(height=height, smooth=smooth)
 
@@ -160,7 +218,36 @@ class MacenkoStyleEstimation:
         self.maxC_avg = maxC
 
     @staticmethod
-    def compute_task(quantity, slide, coord_queue, quantity_queue, I0, alpha, beta, threshold, remainder_queue, stop_event, use_nnls=True, matrix_avg=None):
+    def compute_task(
+                    quantity: str,
+                    slide: SlideImage,
+                    coord_queue: mp.Queue,
+                    quantity_queue: mp.Queue,
+                    I0: np.ndarray,
+                    alpha: float,
+                    beta: float,
+                    threshold: int | tuple[int, int],
+                    remainder_queue: mp.Queue,
+                    stop_event: mp.Event,
+                    use_nnls: bool = True,
+                    matrix_avg: np.array | None = None,
+                    ):
+        """Perform either stain matrix or maxC computation. This is a task function given to workers for parallel processing.
+
+        Args:
+            quantity: Either "matrix" or "maxC" depending on the quantity of interest to calculate.
+            slide: SlideImage to perform the computation on.
+            coord_queue: Queue containing tile coordinates (upper left corner) to process.
+            quantity_queue: Queue to put output computations into.
+            I0: Initial intensity.
+            alpha: Macenko's alpha.
+            beta: Macenko's beta.
+            threshold: Number of pixels to accumulate before executing the computation. Tuple of two ints (HTX, DAB) if stain balancing.
+            remainder_queue: Queue to put leftover pixels into if the worker is at the end of life and doesn't have enough pixels to do another computation.
+            stop_event: Stop event called when workers should stop.
+            use_nnls: Use non-negative least squares for calculating concentrations.
+            matrix_avg: Computed stain matrix (if maxC is being computed).
+        """
 
         stain_balancing = isinstance(threshold, tuple)
 
@@ -244,14 +331,16 @@ class MacenkoStyleEstimation:
         remainder_queue.put(buffer)
         quantity_queue.put(None)
 
-    def compute_tiled_parallel(self, threshold, quantity, num_tiles=500, tile_size=512, detect_fg=False, maxC_mode="mean", **kwargs):
-        """Compute quantity using tiles, parallelized.
+    def compute_tiled_parallel(self, threshold: int | tuple[int, int], quantity: str, num_tiles: int = 500, tile_size: int = 512, detect_fg: bool = False, maxC_mode: str = "mean", **kwargs):
+        """Compute stain matrix or maxC using tiles, parallelized.
 
         Args:
-            threshold (int, tuple): min number of pixels to accumulate before calculating the quantity. If int, there is one threshold. If tuple of two ints, the first is for hematoxylin and second for dab.
-            num_tiles (int): max number of tiles to use for estimation
-            tile_size (int): tile size used
-            detect_fg (bool): detect where the tissue is using the thumbnail
+            threshold: Min number of pixels to accumulate before calculating the quantity. If int, there is one threshold. If tuple of two ints, the first is for hematoxylin and second for DAB.
+            quantity: Either "matrix" or "maxC" depending on the quantity of interest to calculate.
+            num_tiles: Max number of tiles to use for estimation.
+            tile_size: Tile size to use.
+            detect_fg: Detect where the tissue is using the thumbnail.
+            maxC_mode: Type of statistic to calculate over maxC values ("mean" or "percentile" for 100 - alpha percentile of maxC values).
         """
 
         print(f"Computing stain {quantity}...")
@@ -416,7 +505,17 @@ class MacenkoStyleEstimation:
         remainder_queue.cancel_join_thread()
 
 
-    def compute_tiled(self, threshold, quantity, num_tiles=500, tile_size=512, detect_fg=False, maxC_mode="mean", **kwargs):
+    def compute_tiled(self, threshold: int | tuple[int, int], quantity: str, num_tiles: int = 500, tile_size: int = 512, detect_fg: bool = False, maxC_mode: str = "mean", **kwargs):
+        """Compute stain matrix or maxC using tiles (but not in parallel).
+
+        Args:
+            threshold: Min number of pixels to accumulate before calculating the quantity. If int, there is one threshold. If tuple of two ints, the first is for hematoxylin and second for DAB.
+            quantity: Either "matrix" or "maxC" depending on the quantity of interest to calculate.
+            num_tiles: Max number of tiles to use for estimation.
+            tile_size: Tile size to use.
+            detect_fg: Detect where the tissue is using the thumbnail.
+            maxC_mode: Type of statistic to calculate over maxC values ("mean" or "percentile" for 100 - alpha percentile of maxC values).
+        """
 
         print(f"Computing stain {quantity}...")
         print(f"Min pixels to accumulate before calculating = {threshold}")
