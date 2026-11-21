@@ -2,9 +2,9 @@
 Abstract class for stain normalization pipelines.
 
 General pipeline steps for normalization:
-1. Calculate a target style
-2. Calculate a source style
-3. Transform the source
+    1. Calculate a target style
+    2. Calculate a source style
+    3. Transform the source
 """
 from stainnormprogram.slide import SlideImage
 from stainnormprogram.norm.subset import Subset
