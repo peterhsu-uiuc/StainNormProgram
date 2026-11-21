@@ -1,12 +1,3 @@
-"""
-Image writers
-
-Note about viewers: Several WSI viewers were considered when designing the file writing system.
-QuPath is open-source, but I have noticed that it can render colors incorrectly.
-ASAP is open-source, but it doesn't seem to be actively maintained.
-Aperio ImageScope seems to be best and is free, but it is owned by Leica.
-"""
-
 import os
 from collections.abc import Callable
 from typing import Any
