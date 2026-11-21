@@ -3,9 +3,15 @@ from stainnormprogram.slide import SlideImage, is_valid_extension
 import numpy as np
 import os
 
-def nnls(HE, Y): # HE is (3,2) and Y is (3,N)
-    """
-    Modified form of Lawson and Hanson NNLS
+def nnls(HE: np.ndarray, Y: np.ndarray):
+    """Modified form of Lawson and Hanson non-negative least squares.
+
+    Args:
+        HE: The stain matrix. HE should be a 3x2 matrix.
+        Y: The optical density (OD) values. Y should be a 3xN matrix.
+
+    Returns:
+        A np.ndarray for concentration estimates. It will be a 2xN matrix.
     """
 
     C = np.linalg.lstsq(HE, Y, rcond=None)[0] # (2,N)
@@ -40,7 +46,15 @@ def nnls(HE, Y): # HE is (3,2) and Y is (3,N)
 
     return C
 
-def get_paths_in_folder(folder_path):
+def get_paths_in_folder(folder_path: str):
+    """Helper function for getting valid image paths in a folder.
+
+    Args:
+        folder_path: Folder path.
+
+    Returns:
+        A list of str paths for valid image paths in the folder.
+    """
     paths = []
     for file in os.listdir(folder_path):
         full_path = os.path.join(folder_path, file)
@@ -48,7 +62,13 @@ def get_paths_in_folder(folder_path):
             paths.append(full_path)
     return paths
 
-def add_images_to_dict(images, mydict):
+def add_images_to_dict(images: str | list[str], mydict: dict[str, SlideImage]):
+    """Helper function for adding images to a dictionary.
+
+    Args:
+        images: Images to add to the dictionary.
+        mydict: The dictionary to add images to.
+    """
     
     if isinstance(images, str):
         images = [images]
@@ -65,7 +85,13 @@ def add_images_to_dict(images, mydict):
                     image_id = is_valid_extension(p, split=True)[0]
                     mydict[image_id] = SlideImage(p, identifier=image_id)
 
-def validate_json(json_path):
+def validate_json(json_path: str):
+    """Check that the JSON path exists. If it doesn't exist, an Exception is thrown. Otherwise, nothing happens.
+
+    Args:
+        json_path: JSON path to check.
+    """
 
     if not os.path.exists(json_path):
         raise Exception(f"{json_path} does not exist.")
+        
