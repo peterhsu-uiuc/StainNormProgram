@@ -1,9 +1,11 @@
-from stainnormprogram.norm.utils import nnls
 from stainnormprogram.slide import SlideImage
+from stainnormprogram.norm.utils import nnls
+from stainnormprogram.norm.adjustments import Adjustment
 
 import json
 import os
 
+import plotly
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
@@ -12,9 +14,9 @@ from scipy.optimize import least_squares
 
 class MacenkoPointCorrection:
 
-    def __init__(self, optimize="both", correct="source"):
-        self.optimize = optimize
-        self.correct = correct
+    def __init__(self):
+        """Perform correction by selecting corresponding points between a properly normalized image and a failure case.
+        """
 
         self.f = None
 
@@ -34,6 +36,7 @@ class MacenkoPointCorrection:
         self.ref_matrix = None
         self.ref_maxC = None
         self.ref_I0 = None
+        self.ref_pre_adjust = None
         self.before_query_slide = None
         self.after_query_slide = None
         self.query_matrix = None
@@ -45,36 +48,56 @@ class MacenkoPointCorrection:
         self.target_maxC = None
         self.target_I0 = None
 
+        print("""
+        DIRECTIONS:
+
+        First, call all relevant functions to set variables up properly.
+            * set_reference
+            * set_query
+            * set_styles
+
+        When ready to select points, call make_selection.
+
+        Pick a point on the reference, then a point on the query, and repeat until you have >= 10 pairs (20 is recommended).
+        For each pair, you should pick corresponding points (e.g., darkest part of a nucleus in the reference with darkest part of a nucleus in the query).
+        Among all of the pairs, vary the feature selected (e.g. for one pair you can do darkest parts of nuclei, for another pair you can do lightest parts of stroma).
+
+        Then, compute the correction using the compute function.
+
+        Finally, once computation is done, you can view the results using display_results and save using save_corrected_style.
+        """)
+
     def __repr__(self):
-        output = f"""MacenkoPointCorrection(
-            before_ref_slide={self.before_ref_slide}
-            after_ref_slide={self.after_ref_slide}
-            ref_matrix={self.ref_matrix}
-            ref_maxC={self.ref_maxC}
-            ref_I0={self.ref_I0}
+        return f"MacenkoPointCorrection(\n \
+            before_ref_slide={self.before_ref_slide}\n \
+            after_ref_slide={self.after_ref_slide}\n \
+            ref_matrix={self.ref_matrix}\n \
+            ref_maxC={self.ref_maxC}\n \
+            ref_I0={self.ref_I0}\n\n \
+            ref_pre_adjust={self.ref_pre_adjust}\n\n\
+            before_query_slide={self.before_query_slide}\n \
+            after_query_slide={self.after_query_slide}\n \
+            query_matrix={self.query_matrix}\n \
+            query_maxC={self.query_maxC}\n \
+            query_I0={self.query_I0}\n \
+            query_pre_adjust={self.query_pre_adjust}\n \
+            query_post_adjust={self.query_post_adjust}\n\n \
+            target_matrix={self.target_matrix}\n \
+            target_maxC={self.target_maxC}\n \
+            target_I0={self.target_I0}\n)"
 
-            before_query_slide={self.before_query_slide}
-            after_query_slide={self.after_query_slide}
-            query_matrix={self.query_matrix}
-            query_maxC={self.query_maxC}
-            query_I0={self.query_I0}
-            query_pre_adjust={self.query_pre_adjust}
-            query_post_adjust={self.query_post_adjust}
+    def save_corrected_style(self, output_path: str):
+        """Save the corrected source stain style.
 
-            target_matrix={self.target_matrix}
-            target_maxC={self.target_maxC}
-            target_I0={self.target_I0}
-        )
+        Args:
+            output_path: File path to output the corrected staining style to. Should end with .json.
         """
-        return output
-
-    def save_corrected_style(self, output_path):
 
         if os.path.exists(output_path):
-            raise Exception
+            raise Exception("File already exists. Choose a different output_path.")
 
         if self.matrix_new is None or self.maxC_new is None:
-            raise Exception
+            raise Exception("Run correction first.")
 
         output_dict = {
             "matrix": self.matrix_new.tolist(),
@@ -86,7 +109,14 @@ class MacenkoPointCorrection:
         with open(output_path, "w") as file:
             json.dump(output_dict, file, indent=4)
 
-    def set_reference(self, before_ref_slide, after_ref_slide):
+    def set_reference(self, before_ref_slide: str | SlideImage, after_ref_slide: str | SlideImage, pre_adjustment: Adjustment | None = None):
+        """Set the reference slide (a slide that was normalized well).
+
+        Args:
+            before_ref_slide: Either a SlideImage or str path to the image before normalization (the original).
+            after_ref_slide: Either a SlideImage or str path to the image after normalization.
+            pre_adjustment: Pre-adjustment to apply. This should be the same pre-adjustment used when you stain normalized the reference.
+        """
         if isinstance(before_ref_slide, SlideImage):
             self.before_ref_slide = before_ref_slide
         else:
@@ -96,10 +126,24 @@ class MacenkoPointCorrection:
         else:
             self.after_ref_slide = SlideImage(after_ref_slide)
 
-        self.before_ref_slide.set_adjustment(None)
+        self.before_ref_slide.set_adjustment(pre_adjustment)
         self.after_ref_slide.set_adjustment(None)
 
-    def set_query(self, before_query_slide, after_query_slide):
+        self.ref_pre_adjust = pre_adjustment
+        
+    def set_query(self, before_query_slide: str | SlideImage, after_query_slide: str | SlideImage, pre_adjustment: Adjustment | None = None, post_adjustment: Adjustment | None = None):
+        """Set the query slide (a slide that was not normalized well).
+
+        When setting ``pre_adjustment`` and ``post_adjustment``, note that you should use these exact Adjustments when performing stain normalization after correction to ensure
+        the results you see during correction match those when normalizing the entire image. Also note that ``post_adjustment`` should be the same as the post-adjustment that was used
+        on the normalized reference.
+
+        Args:
+            before_query_slide: Either a SlideImage or str path to the image before normalization (the original).
+            after_query_slide: Either a SlideImage or str path to the image after normalization.
+            pre_adjustment: Pre-adjustment to apply.
+            post_adjustment: Post-adjustment to apply.
+        """
         if isinstance(before_query_slide, SlideImage):
             self.before_query_slide = before_query_slide
         else:
@@ -109,10 +153,22 @@ class MacenkoPointCorrection:
         else:
             self.after_query_slide = SlideImage(after_query_slide)
 
-        self.before_query_slide.set_adjustment(None)
+        self.before_query_slide.set_adjustment(pre_adjustment)
         self.after_query_slide.set_adjustment(None)
 
-    def load_style(self, path, separate=False):
+        self.query_pre_adjust = pre_adjustment
+        self.query_post_adjust = post_adjustment
+
+    def load_style(self, path: str, separate: bool = False) -> dict[str, np.ndarray] | tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Helper function for loading stain style JSONs.
+
+        Args:
+            path: Path to the JSON file.
+            separate: If True, will return a tuple of matrix, maxC, and I0 instead of a dictionary.
+
+        Returns:
+            Either a tuple or dictionary of the matrix, maxC, and I0.
+        """
         with open(path, "r") as file:
             style = json.load(file)
         style["matrix"] = np.array(style["matrix"])
@@ -123,6 +179,13 @@ class MacenkoPointCorrection:
         return style["matrix"], style["maxC"], style["I0"]
         
     def set_styles(self, ref_style, query_style, target_style):
+        """Set stain styles.
+
+        Args:
+            ref_style: Path to the reference image stain style JSON.
+            query_style: Path to the query image stain style JSON.
+            target_style: Path to the target stain style JSON.
+        """
         if isinstance(ref_style, str) and ref_style.endswith(".json"):
             self.ref_matrix, self.ref_maxC, self.ref_I0 = self.load_style(ref_style, separate=True)
         if isinstance(query_style, str) and query_style.endswith(".json"):
@@ -130,13 +193,19 @@ class MacenkoPointCorrection:
         if isinstance(target_style, str) and target_style.endswith(".json"):
             self.target_matrix, self.target_maxC, self.target_I0 = self.load_style(target_style, separate=True)
 
-    def set_adjustments(self, query_pre_adjust, query_post_adjust):
-        self.query_pre_adjust = query_pre_adjust
-        self.query_post_adjust = query_post_adjust
-        raise Exception
+    def make_selection(self, ref_y: int, ref_x: int, query_y: int, query_x: int, tile_size: int) -> plotly.graph_objects.Figure:
+        """Make point selections.
 
-    def make_selection(self, ref_y, ref_x, query_y, query_x, tile_size, points=20, prompt=True):
+        Args:
+            ref_y: Upper left corner y-coordinate for the region of interest in the reference to show.
+            ref_x: Upper left corner x-coordinate for the region of interest in the reference to show.
+            query_y: Upper left corner y-coordinate for the region of interest in the query to show.
+            query_x: Upper left corner x-coordinate for the region of interest in the query to show.
+            tile_size: Pixel size of the regions of interest.
 
+        Returns:
+            A Plotly figure for making the point selection.
+        """
         self.ref_y = ref_y
         self.ref_x = ref_x
         self.query_y = query_y
@@ -144,12 +213,28 @@ class MacenkoPointCorrection:
         self.tile_size = tile_size
 
         if self.f is None:
-            return self.setup_fig(ref_y, ref_x, query_y, query_x, tile_size, points, prompt)
+            return self.setup_fig(ref_y, ref_x, query_y, query_x, tile_size)
 
         else:
-            raise Exception
+            self.clicked_ref = self.f.data[0].customdata[1]
+            self.clicked_query = self.f.data[1].customdata[1]
+            return self.setup_fig(ref_y, ref_x, query_y, query_x, tile_size, clicked_ref=self.clicked_ref, clicked_query=self.clicked_query)
 
-    def setup_fig(self, ref_y, ref_x, query_y, query_x, tile_size, points=20, prompt=True):
+    def setup_fig(self, ref_y: int, ref_x: int, query_y: int, query_x: int, tile_size: int, clicked_ref: list[tuple[int, int]] = [], clicked_query: list[tuple[int, int]] = []) -> plotly.graph_objects.Figure:
+        """Setup the Plotly point selection figure.
+
+        Args:
+            ref_y: Upper left corner y-coordinate for the region of interest in the reference to show.
+            ref_x: Upper left corner x-coordinate for the region of interest in the reference to show.
+            query_y: Upper left corner y-coordinate for the region of interest in the query to show.
+            query_x: Upper left corner x-coordinate for the region of interest in the query to show.
+            tile_size: Pixel size of the regions of interest.
+            clicked_ref: Clicked reference points (if resuming).
+            clicked_query: Clicked query points (if resuming).
+
+        Returns:
+            A Plotly figure for making the point selection.
+        """
 
         # Load in ref tile
         ref_tile = self.after_ref_slide.get_tile(ref_y, ref_x, tile_size, tile_size)
@@ -161,11 +246,11 @@ class MacenkoPointCorrection:
         fig = make_subplots(rows=1, cols=2, subplot_titles=("Reference", "Query"))
 
         fig.add_trace(
-            go.Image(z=ref_tile.rgb(as_uint8=True), x0=ref_x, y0=ref_y, customdata=["Reference", []]), row=1, col=1
+            go.Image(z=ref_tile.rgb(as_uint8=True), x0=ref_x, y0=ref_y, customdata=["Reference", clicked_ref]), row=1, col=1
         )
         
         fig.add_trace(
-            go.Image(z=query_tile.rgb(as_uint8=True), x0=query_x, y0=query_y, customdata=["Query", []]), row=1, col=2
+            go.Image(z=query_tile.rgb(as_uint8=True), x0=query_x, y0=query_y, customdata=["Query", clicked_query]), row=1, col=2
         )
         
         fig.update_layout(title=f"Select correspondences in the Reference and Query images",
@@ -197,9 +282,18 @@ class MacenkoPointCorrection:
         return self.f
 
     def clear_selection(self):
+        """Clear the selection. To select again, call make_selection.
+        """
         self.f = None
 
-    def compute(self, c_ref=None, c_query=None, lam=0):
+    def compute(self, c_ref: list[tuple[int]] | None = None, c_query: list[tuple[int]] | None = None, lam: float = 0.0):
+        """Compute the correction from the selected points.
+
+        Args:
+            c_ref: Selected coordinate points on the reference image. If not given, will take from the Plotly figure automatically.
+            c_query: Selected coordinate points on the query image. If not given, will take from the Plotly figure automatically.
+            lam: Lambda coefficient to control the influence of the past stain style calculation [0.0,1.0]. 0.0 is no influence from the past.
+        """
         # Given: a list of corresponding points (as pairs) in overall slide coordinates
         if c_ref is None:
             self.clicked_ref = self.f.data[0].customdata[1]
@@ -214,9 +308,9 @@ class MacenkoPointCorrection:
         print("Query points:", self.clicked_query)
 
         if len(self.clicked_ref) != len(self.clicked_query):
-            raise Exception
+            raise Exception("You did not click the same number of points in the reference and query.")
         if len(self.clicked_ref) < 10:
-            raise Exception
+            raise Exception("Pick more points. You have less than 10.")
         print("Number of correspondences:", len(self.clicked_ref))
 
         # Extract the Y values from those points before normalization
@@ -297,7 +391,19 @@ class MacenkoPointCorrection:
         print(self.maxC_new)
         print("Cost values:", eq1.cost, eq2.cost, eq3.cost)
 
-    def display_results(self, ref_y=None, ref_x=None, query_y=None, query_x=None, tile_size=None):
+    def display_results(self, ref_y: int = None, ref_x: int = None, query_y: int = None, query_x: int = None, tile_size: int = None) -> plotly.graph_objects.Figure:
+        """Display results of the correction.
+
+        Args:
+            ref_y: Upper left corner y-coordinate for the region of interest in the reference to show.
+            ref_x: Upper left corner x-coordinate for the region of interest in the reference to show.
+            query_y: Upper left corner y-coordinate for the region of interest in the query to show.
+            query_x: Upper left corner x-coordinate for the region of interest in the query to show.
+            tile_size: Pixel size of the regions of interest.
+
+        Returns:
+            A Plotly figure showing the results of correction.
+        """
         if ref_y is None:
             ref_y = self.ref_y
         if ref_x is None:
@@ -309,7 +415,7 @@ class MacenkoPointCorrection:
         if tile_size is None:
             tile_size = self.tile_size
         if self.matrix_new is None or self.maxC_new is None:
-            raise Exception
+            raise Exception("Call compute first.")
             
         # Find original Y values of the tile
         query_tile_od = self.before_query_slide.get_tile(query_y, query_x, tile_size, tile_size).od(self.query_I0)
@@ -324,18 +430,19 @@ class MacenkoPointCorrection:
         C2 = C * scaling_factor
 
         Inorm = np.exp(-self.target_matrix.dot(C2))
+        if self.query_post_adjust is not None:
+            Inorm = self.query_post_adjust.apply(Inorm)
         Inorm = Inorm * self.target_I0[:, np.newaxis]
         Inorm = np.clip(Inorm, 0, 255).astype(np.uint8)
         Inorm = np.reshape(Inorm.transpose(), (h, w, 3))
 
-        # Show tile normalized
 
         ref_tile = self.after_ref_slide.get_tile(ref_y, ref_x, tile_size, tile_size).rgb(as_uint8=True)
         query_tile_norm = self.after_query_slide.get_tile(query_y, query_x, tile_size, tile_size).rgb(as_uint8=True)
         query_tile_orig = self.before_query_slide.get_tile(query_y, query_x, tile_size, tile_size).rgb(as_uint8=True)
         
         
-        fig = make_subplots(rows=1, cols=4, subplot_titles=("Reference", "Query After", "Query Before", "Query Original"))
+        fig = make_subplots(rows=1, cols=4, subplot_titles=("Reference Norm", "Query Corrected Norm", "Query Initial Norm", "Query Before Norm"))
 
         fig.add_trace(
             go.Image(z=ref_tile, x0=ref_x, y0=ref_y), row=1, col=1
@@ -359,3 +466,4 @@ class MacenkoPointCorrection:
                          )
 
         return fig
+        
