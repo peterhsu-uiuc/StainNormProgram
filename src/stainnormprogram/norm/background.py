@@ -7,7 +7,7 @@ from fastdigest import TDigest
 from skimage.color import rgb2hsv
 from skimage.filters import threshold_otsu
 
-def otsu_threshold_foreground(tile: Tile, flatten: bool = False):
+def otsu_threshold_foreground(tile: Tile, flatten: bool = False) -> np.ndarray:
     """Compute a foreground tissue mask using Otsu's thresholding.
 
     Args:
@@ -25,7 +25,7 @@ def otsu_threshold_foreground(tile: Tile, flatten: bool = False):
     fg_mask = gray_tile < thresh
     return fg_mask
 
-def hsv_threshold_foreground(tile: Tile, s_threshold: float = 0.05, v_threshold: float = 0.15, flatten: bool = False):
+def hsv_threshold_foreground(tile: Tile, s_threshold: float = 0.05, v_threshold: float = 0.15, flatten: bool = False) -> np.ndarray:
     """Compute the foreground tissue mask using HSV thresholds.
 
     HSV pixels with saturation greater than s_threshold and value (brightness) greater than v_threshold are considered foreground.
@@ -64,7 +64,7 @@ class HSVBackgroundEstimation:
         self.s_threshold = s_threshold
         self.v_threshold = v_threshold
 
-    def compute(self, method: str, options: dict[str, Any] = {}):
+    def compute(self, method: str, options: dict[str, Any] = {}) -> dict[str, np.ndarray]:
         """Perform the background color estimation.
 
         Args:
@@ -85,7 +85,7 @@ class HSVBackgroundEstimation:
         else:
             raise Exception(f"{method} is not a valid method.")
 
-    def thumbnail_compute(self, height: int = 4096, smooth: bool = True, use_otsu: bool = False):
+    def thumbnail_compute(self, height: int = 4096, smooth: bool = True, use_otsu: bool = False) -> dict[str, np.ndarray]:
         """Compute the background using a thumbnail.
 
         Args:
@@ -113,7 +113,7 @@ class HSVBackgroundEstimation:
 
         return {"median": I0}
 
-    def tiled_compute(self, percentile: int = 50, max_pixels: int = 10_000_000, tile_size: int = 256, stability_check_interval: int = 10, stability_window: int = 3):
+    def tiled_compute(self, percentile: int = 50, max_pixels: int = 10_000_000, tile_size: int = 256, stability_check_interval: int = 10, stability_window: int = 3) -> dict[str, np.ndarray]:
         """Compute the background using full resolution tiles.
 
         Args:
@@ -187,7 +187,7 @@ class HSVBackgroundEstimation:
         else:
             return {str(percentile): I0}
 
-    def _compute_percentile(self, masked_rgb: pyvips.Image, percentile: int):
+    def _compute_percentile(self, masked_rgb: pyvips.Image, percentile: int) -> np.ndarray:
         """Compute the RGB value at a certain percentile for a pyvips image.
 
         Args:
@@ -209,7 +209,7 @@ class HSVBackgroundEstimation:
         percentile_rgb = np.array(percentile_rgb)
         return percentile_rgb
 
-    def pyvips_compute(self, measures: list[str | int] = ["median"], downsample_factor: float = 1.0, downsample_kernel: str = "nearest", **kwargs):
+    def pyvips_compute(self, measures: list[str | int] = ["median"], downsample_factor: float = 1.0, downsample_kernel: str = "nearest", **kwargs) -> dict[str, np.ndarray]:
         """Compute the background using a pyvips image.
 
         Args:
