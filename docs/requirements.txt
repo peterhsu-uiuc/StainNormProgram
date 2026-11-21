@@ -1,5 +1,5 @@
 sphinx==7.1.2
 sphinx-rtd-theme==1.3.0rc1
-astroid>=3.3.8
+astroid==3.3.8
 sphinx-autoapi
 pydata-sphinx-theme
