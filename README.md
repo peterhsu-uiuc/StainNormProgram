@@ -14,7 +14,9 @@ StainNormProgram provides the utilities needed to perform stain normalization on
 pip install stainnormprogram
 ```
 
-To learn how to use StainNormProgram, check out the `tutorials/` folder.
+To learn how to use StainNormProgram, check out the [`tutorials/`](https://github.com/peterhsu-uiuc/StainNormProgram/tree/main/tutorials) folder.
+
+For the API documentation, please see https://stainnormprogram.readthedocs.io/en/latest/.
 
 ## Citation
 
