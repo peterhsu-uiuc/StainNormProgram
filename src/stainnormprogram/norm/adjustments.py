@@ -2,20 +2,17 @@ import pyvips
 import numpy as np
 
 class Adjustment:
-    """Adjustment operations.
+ 
+    def __init__(self, shift: int | None = None, gamma: float | None = None):
+        """
+        ``Adjustment`` allows you to apply pre- and post-processing operations on images.
+        For example, changing the brightness of an image before stain normalization.
 
-    Sometimes, it may be desirable to perform pre- or post-processing operations on the images. Such operations may be required by multiple parts of the normalization pipeline. For example, if you want to pre-brighten an image but do not want to spend I/O time and disk memory writing a brightened version of the image, you can create an Adjustment, which applies pre-brightening whenever the pipeline retrieves pixels from the image.
-    
-    """
-
-    def __init__(self, shift=None, gamma=None):
-        """Create an adjustment.
-
-        Adjustment only allows for one type of adjustment.
+        **Note:** Only one type of adjustment is allowed (e.g., do not specify both shift and gamma).
 
         Args:
-            shift (int): Add/subtract a value from the RGB values (which results in brightening/darkening).
-            gamma (float): Perform a gamma adjustment.
+            shift: Add/subtract a value from the RGB values (which results in brightening/darkening).
+            gamma: Perform a gamma adjustment.
         """
 
         self.shift = None
@@ -25,11 +22,16 @@ class Adjustment:
             self.shift = shift
         elif gamma is not None:
             self.gamma = gamma
-        else:
-            raise Exception
-        
-    def apply_shift(self, image):
 
+    def apply_shift(self, image: pyvips.Image | np.ndarray) -> pyvips.Image | np.ndarray:
+        """Apply a brightness shift.
+
+        Args:
+            image: Image to perform the brightness shift on.
+
+        Returns:
+            The image (same type as the input) with a brightness shift applied.
+        """
         output = None
 
         if isinstance(image, pyvips.Image):
@@ -43,22 +45,37 @@ class Adjustment:
             output = np.clip(output, 0, 255)
             output = output.astype(np.uint8)
         else:
-            raise Exception
+            raise Exception("image was not a Pyvips image nor a NumPy array.")
 
         return output
 
-    def apply_gamma(self, image):
+    def apply_gamma(self, image: np.ndarray) -> np.ndarray:
+        """Apply a gamma correction.
 
+        Args:
+            image: Image to perform the gamma correction on.
+
+        Returns:
+            A np.ndarray of the gamma corrected image.
+        """
         output = None
 
         if isinstance(image, np.ndarray):
             output = np.pow(image, self.gamma)
         else:
-            raise Exception
+            raise Exception("image must be a np.ndarray.")
 
         return output
 
-    def apply(self, image):
+    def apply(self, image: Any) -> Any:
+        """Apply the adjustment to the image.
+
+        Args:
+            image: Image to perform the adjustment on.
+
+        Returns:
+            The adjusted image.
+        """
 
         output = None
 
@@ -69,9 +86,3 @@ class Adjustment:
             output = self.apply_gamma(image)
 
         return output
-
-            
-
-            
-            
-
