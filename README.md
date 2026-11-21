@@ -18,6 +18,10 @@ To learn how to use StainNormProgram, check out the [`tutorials/`](https://githu
 
 For the API documentation, please see https://stainnormprogram.readthedocs.io/en/latest/.
 
+## Reading Output Images
+
+Stain normalized images outputted by this program can be opened using [Aperio ImageScope](https://www.leicabiosystems.com/us/digital-pathology/manage/aperio-imagescope/) or [tifffile](https://github.com/cgohlke/tifffile).
+
 ## Citation
 
 ```
