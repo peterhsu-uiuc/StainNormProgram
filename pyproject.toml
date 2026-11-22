@@ -4,7 +4,6 @@ build-backend = "hatchling.build"
 
 [project]
 name = "stainnormprogram"
-version = "1.0.0"
 dynamic = ["version"]
 description = 'A program that does stain normalization.'
 readme = "README.md"
