@@ -118,7 +118,7 @@ class HSVBackgroundEstimation:
 
         Args:
             percentile: Background percentile to compute (50 = median).
-            max_pixels: Max number of pixels to use.
+            max_pixels: If the number of pixels used goes over max_pixels, stop the computation.
             tile_size: Tile size to use.
             stability_check_interval: Check for stability every ``stability_check_interval`` number of updates to the running background color.
             stability_window: Number of stability checks that must pass before finishing the computation.

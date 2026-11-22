@@ -32,7 +32,7 @@ class Contrast:
             tile_size: Tile size to use.
             background_method: Method for identifying the background/foreground.
             accept_perc: Tiles with less than accept_perc percent of foreground are not used in the computation.
-            max_pixels: Max number of pixels to use.
+            max_pixels: If the number of pixels used goes over max_pixels, stop the computation.
             tile_locs: Tile locations to visit. Useful when you want to compare the contrast between two images and use the same tiles for both. Should be a list of locations, each location is a dict with "x", "y", "w", "h", and (if SlideImageCollection) "identifier" keys.
         """
         self.slide = slide

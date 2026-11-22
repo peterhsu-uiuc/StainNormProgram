@@ -111,7 +111,7 @@ class Gamut:
             tile_size: Tile size to use.
             background_method: Method for identifying the background/foreground.
             accept_perc: Tiles with less than accept_perc percent of foreground are not used in the computation.
-            max_pixels: Max number of pixels to use.
+            max_pixels: If the number of pixels used goes over max_pixels, stop the computation.
         """
         
         self.slide = slide
