@@ -4,17 +4,41 @@ import stainnormprogram.norm.background as background
 import itertools
 import statistics
 from typing import Union
+import os
+import json
 
 import fast_colorthief
 import colour
 import numpy as np
 from sklearn.cluster import KMeans
+import matplotlib
 
 class Palette:
-    """Generate a color palette using fast_colorthief (Modified Median Cut Quantization)
-    """
 
-    def __init__(self, slide, identifier=None, tile_size=32, background_method="hsv_threshold", accept_perc=10, max_pixels=1_000_000, color_count=10):
+    def __init__(
+        self,
+        slide: SlideImage | SlideImageCollection,
+        identifier: str | None = None,
+        tile_size: int = 32,
+        background_method: str = "hsv_threshold",
+        accept_perc: int = 10,
+        max_pixels: int = 1_000_000,
+        color_count: int = 10
+        ):
+        """Generate a color palette using fast_colorthief (Modified Median Cut Quantization).
+
+        Options for ``background_method``:
+            * "hsv_threshold": Threshold using saturation and value channels in HSV color space.
+
+        Args:
+            slide: The slide to compute the palette of.
+            identifier: An ID for this Palette. If None, the identifier of the slide will be used.
+            tile_size: Tile size to use.
+            background_method: Method for identifying the background/foreground.
+            accept_perc: Tiles with less than accept_perc percent of foreground are not used in the computation.
+            max_pixels: If the number of pixels used goes over max_pixels, stop the computation.
+            color_count: Number of colors for the palette.
+        """
 
         self.slide = slide
         self.identifier = identifier if identifier is not None else self.slide.identifier
@@ -23,31 +47,78 @@ class Palette:
         self.color_count = color_count
         
         # Tile size
-        self.slide.set_tile_size(tile_size)
+        if self.slide is not None:
+            self.slide.set_tile_size(tile_size)
         
         self.num_pixels = 0
         self.num_tiles = 0
         self.max_pixels = max_pixels
+        self.tile_size = tile_size
 
         self.palette = None
 
-    def __getstate__(self):
-        state = self.__dict__.copy()
-        del state["slide"]
-        return state
+    def save(self, output_dir: str):
+        """Save metric to disk.
 
-    def __setstate__(self, state):
-        self.__dict__.update(state)
-        self.slide = None
+        Args:
+            output_dir: Folder path to output the metric to.
+        """
 
-    def extract_pixels(self, tile):
+        json_output_path = os.path.join(output_dir, "palette.json")
+        with open(json_output_path, "w") as file:
+            json.dump({
+                "identifier": self.identifier,
+                "background_method": self.background_method,
+                "accept_perc": self.accept_perc,
+                "color_count": self.color_count,
+                "tile_size": self.tile_size,
+                "num_pixels": self.num_pixels,
+                "num_tiles": self.num_tiles,
+                "max_pixels": self.max_pixels,
+            }, file)
+
+        palette_output_path = os.path.join(output_dir, "palette.npz")
+        np.savez(palette_output_path, palette=self.palette, allow_pickle=False)
+
+    @classmethod
+    def load(cls, input_dir: str) -> Palette:
+        """Load metric from disk.
+
+        Args:
+            input_dir: Folder path to load the metric from.
+
+        Returns:
+            A Palette.
+        """
+
+        json_input_path = os.path.join(input_dir, "palette.json")
+        with open(json_input_path, "r") as file:
+            json_data = json.load(file)
+
+        pl = cls(None, identifier=json_data["identifier"], tile_size=json_data["tile_size"], background_method=json_data["background_method"], accept_perc=json_data["accept_perc"], max_pixels=json_data["max_pixels"], color_count=json_data["color_count"])
+        
+        palette_input_path = os.path.join(input_dir, "palette.npz")
+        with np.load(palette_input_path, allow_pickle=False) as data:
+            pl.palette = data["palette"]
+
+        return pl
+
+    def extract_pixels(self, tile: Tile):
+        """Extract foreground pixels from a tile for palette computation.
+
+        Args:
+            tile: The tile to extract pixels from.
+
+        Returns:
+            A (N,3) RGB np.uint8 array containing foreground pixels, or None if the tile was rejected for having less than accept_perc percent of foreground.
+        """
         
         if self.background_method == "hsv_threshold":
             fg_mask = background.hsv_threshold_foreground(tile).flatten()
         else:
-            raise Exception
+            raise Exception(f"{self.background_method} is not a valid background method.")
 
-        n = np.sum(fg_mask)
+        n = np.sum(fg_mask).item()
         if n / fg_mask.size * 100 < self.accept_perc:
             return None
 
@@ -60,6 +131,8 @@ class Palette:
         return rgb # (N,3)
 
     def compute(self):
+        """Compute the Palette.
+        """
 
         print(f"Computing Palette for {self.identifier}...")
 
@@ -94,17 +167,37 @@ class Palette:
         
         print("Finished computing Palette")
 
-    def display(self):
+    def display(self) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+        """Display the palette.
+
+        Returns:
+            A palette matplotlib figure.
+        """
         return colour.plotting.plot_multi_colour_swatches(self.palette / 255.)
 
-    def get_palette(self, normalized=False):
+    def get_palette(self, normalized: bool = False) -> np.ndarray:
+        """Get the palette as a np.ndarray.
+
+        Args:
+            normalized: If True, will divide by 255.
+
+        Returns:
+            A np.ndarray (np.uint8 RGB) representing the palette with shape (color_count, 3).
+        """
         if normalized:
             return self.palette / 255
         return self.palette
 
 class ReferencePalette:
 
-    def __init__(self, palettes, identifier=None, color_count=10):
+    def __init__(self, palettes: Palette | list[Palette], identifier: str | None = None, color_count: int = 10):
+        """A palette for the reference (which may represent multiple reference images).
+
+        Args:
+            palettes: One or more Palettes from the reference image(s).
+            identifier: An ID for this ReferencePalette. If None, only one Palette must be in palettes, and the ID from this Palette will be used.
+            color_count: Number of colors for the ReferencePalette.
+        """
         self.palettes = palettes
         self.color_count = color_count
         if identifier is not None:
@@ -118,10 +211,68 @@ class ReferencePalette:
 
         self.palette = None
 
-    def display(self):
+    def save(self, output_dir: str):
+        """Save metric to disk.
+
+        Args:
+            output_dir: Folder path to output the metric to.
+        """
+
+        palette_identifiers = []
+        for p in self.palettes:
+            palette_identifiers.append(p.identifier)
+
+        json_output_path = os.path.join(output_dir, "reference_palette.json")
+        with open(json_output_path, "w") as file:
+            json.dump({
+                "identifier": self.identifier,
+                "palette_identifiers": palette_identifiers,
+                "color_count": self.color_count,
+            }, file)
+
+        palette_output_path = os.path.join(output_dir, "reference_palette.npz")
+        np.savez(palette_output_path, palette=self.palette, allow_pickle=False)
+
+    @classmethod
+    def load(cls, input_dir: str) -> ReferencePalette:
+        """Load metric from disk.
+
+        Args:
+            input_dir: Folder path to load the metric from.
+
+        Returns:
+            A ReferencePalette.
+        """
+
+        json_input_path = os.path.join(input_dir, "reference_palette.json")
+        with open(json_input_path, "r") as file:
+            json_data = json.load(file)
+
+        rp = cls(json_data["palette_identifiers"], identifier=json_data["identifiers"], color_count=json_data["color_count"])
+        
+        rp_input_path = os.path.join(input_dir, "reference_palette.npz")
+        with np.load(rp_input_path, allow_pickle=False) as data:
+            rp.palette = data["palette"]
+
+        return rp
+
+    def display(self) -> tuple[matplotlib.figure.Figure, matplotlib.axes.Axes]:
+        """Display the palette.
+
+        Returns:
+            A palette matplotlib figure.
+        """
         return colour.plotting.plot_multi_colour_swatches(self.palette / 255.)
 
-    def get_palette(self, normalized=False):
+    def get_palette(self, normalized: bool = False) -> np.ndarray:
+        """Get the palette as a np.ndarray.
+
+        Args:
+            normalized: If True, will divide by 255.
+
+        Returns:
+            A np.ndarray (np.uint8 RGB) representing the palette with shape (color_count, 3).
+        """
         if normalized:
             return self.palette / 255
         return self.palette
@@ -152,24 +303,112 @@ class ReferencePalette:
             
 class PaletteEvaluation:
 
-    def __init__(self, palette: Union[np.ndarray, Palette, ReferencePalette], stain="HE"):
-        """Create a Palette evaluation.
+    def __init__(self, palette: np.ndarray | Palette | ReferencePalette, stain: str = "HE", identifier: str | None = None):
+        """Evaluate a single palette.
+
+        This evaluation calculates the following metrics:
+            * Palette diversity (attribute: ``diversity``):  Calculates the delta E between all pairs of colors. This is independent of the stain type.
+            * HE metrics
+                * H&E separability (HEsep; attribute ``pink_purple_separation``): How different the pinks are from the purples.
+                * Eosin diversity (Ediv; attribute ``pink_diversity``): How diverse the pink colors are.
+                * Hematoxylin diversity (Hdiv; atribute ``purple_diversity``): How diverse the purple colors are.
+                
+        Other relevant attributes:
+            * ``pinks_idx``: The indices of the pink colors in the palette array.
+            * ``purples_idx``: The indices of the purple colors in the palette array.
+            * ``others_idx``: The indices of the other colors not identified as pink nor purple in the palette array.
+            * ``palette_colors_names``: The names of the colors in the palette array. Names supported can be found by calling ``get_reference_colors``.
+
+        Options for ``stain``:
+            * "HE": Hematoxylin and eosin.
 
         Args:
-            palette: Array of RGB values (uint8) representing a color palette; shape should be (N,3). Or a Palette/ReferencePalette.
+            palette: Array of RGB values (np.uint8) representing a color palette; shape should be (N,3). Or a Palette/ReferencePalette.
+            stain: The stain type.
+            identifier: The ID for this PaletteEvaluation. If None, the ID from the Palette or ReferencePalette is taken.
         """
+        if identifier is not None:
+            self.identifier = identifier
+        elif isinstance(palette, (Palette, ReferencePalette)):
+            self.identifier = palette.identifier
+        else:
+            Exception("Set an identifier.")
 
         if isinstance(palette, np.ndarray):
             self.palette_sRGB = palette / 255
         elif isinstance(palette, (Palette, ReferencePalette)):
             self.palette_sRGB = palette.get_palette(normalized=True)
         else:
-            raise Exception
+            raise Exception("palette must be a np.ndarray, Palette, or ReferencePalette.")
+
         self.palette_Lab = self.sRGB_to_Lab(self.palette_sRGB)
         self.reference_colors, self.reference_colors_names = self.get_reference_colors()
         self.stain = stain
+        self.pink_purple_separation = None
+        self.pink_diversity = None
+        self.purple_diversity = None
+        self.pinks_idx = None
+        self.purples_idx = None
+        self.others_idx = None
+        self.palette_colors_names = None
+        self.diversity = None
 
-    def get_reference_colors(self):
+    def save(self, output_dir: str):
+        """Save metric to disk.
+
+        Args:
+            output_dir: Folder path to output the metric to.
+        """
+
+        json_output_path = os.path.join(output_dir, "palette_evaluation.json")
+        with open(json_output_path, "w") as file:
+            json.dump({
+                "identifier": self.identifier,
+                "stain": self.stain,
+                "pink_purple_separation": self.pink_purple_separation,
+                "pink_diversity": self.pink_diversity,
+                "purple_diversity": self.purple_diversity,
+                "pinks_idx": self.pinks_idx,
+                "purples_idx": self.purples_idx,
+                "others_idx": self.others_idx,
+                "palette_colors_names": self.palette_colors_names,
+                "diversity": self.diversity,
+            }, file)
+
+    @classmethod
+    def load(cls, input_dir: str, palette: np.ndarray | Palette | ReferencePalette | None) -> PaletteEvaluation:
+        """Load metric from disk.
+
+        Args:
+            input_dir: Folder path to load the metric from.
+            palette: The palette. Can be None if computing the PaletteEvaluation in the future is not desired and the object is just being used to store the already computed metrics.
+
+        Returns:
+            A PaletteEvaluation.
+        """
+
+        json_input_path = os.path.join(input_dir, "palette_evaluation.json")
+        with open(json_input_path, "r") as file:
+            json_data = json.load(file)
+
+        pe = cls(palette, stain=json_data["stain"], identifier=json_data["identifier"])
+        pe.pink_purple_separation = json_data["pink_purple_separation"]
+        pe.pink_diversity = json_data["pink_diversity"]
+        pe.purple_diversity = json_data["purple_diversity"]
+        pe.pinks_idx = json_data["pinks_idx"]
+        pe.purples_idx = json_data["purples_idx"]
+        pe.others_idx = json_data["others_idx"]
+        pe.palette_colors_names = json_data["palette_colors_names"]
+        pe.diversity = json_data["diversity"]
+
+        return pe
+
+    def get_reference_colors(self) -> tuple[np.ndarray, list[str]]:
+        """Get the reference colors used to identify the "names" of the colors in the palette.
+
+        Returns:
+            A tuple containing (the reference color RGB values as a np.ndarray normalized by 255., the reference color names as a list of str).
+        """
         reference_colors = np.array([
             [255, 0, 0], # red
             [255, 192, 203], # pink
@@ -190,7 +429,15 @@ class PaletteEvaluation:
         ]
         return self.sRGB_to_Lab(reference_colors), reference_colors_names
         
-    def sRGB_to_Lab(self, sRGB):
+    def sRGB_to_Lab(self, sRGB: np.ndarray) -> np.ndarray:
+        """Convert sRGB values into CIELAB.
+
+        Args:
+            sRGB: An array of sRGB values.
+
+        Returns:
+            A np.ndarray of the colors converted to CIELAB.
+        """
         return colour.XYZ_to_Lab(colour.sRGB_to_XYZ(sRGB))
 
     def palette_diversity(self):
@@ -202,7 +449,7 @@ class PaletteEvaluation:
             dE = colour.delta_E(c1, c2, method="CIE 2000")
             delta_Es.append(dE)
 
-        self.palette_diversity = statistics.mean(delta_Es)
+        self.diversity = statistics.mean(delta_Es)
         
     def palette_he(self):
         """Compute palette "HE-ness."
@@ -259,14 +506,21 @@ class PaletteEvaluation:
         self.pink_purple_separation, self.pink_diversity, self.purple_diversity, self.pinks_idx, self.purples_idx, self.others_idx, self.palette_colors_names = pink_purple_separation, pink_diversity, purple_diversity, pinks_idx, purples_idx, others_idx, palette_colors_names
 
     def compute(self):
+        """Compute the PaletteEvaluation.
+        """
 
         self.palette_diversity()
-        self.palette_he()
+        if self.stain == "HE":
+            self.palette_he()
 
 class PaletteComparison:
 
     def __init__(self, reference: PaletteEvaluation, query: PaletteEvaluation, method: str = "pairwise"):
-        """Construct a PaletteComparison.
+        """Compare two palettes.
+
+        Options for ``method``:
+            * "pairwise": Compare the two palettes using pairwise comparison.
+            * "dominant_he": Compare the two palettes using only their dominant pink color and dominant purple color. Assumes that the palettes are ordered such that the more dominant colors have lower index values.
 
         Args:
             reference: Reference PaletteEvaluation.
@@ -278,7 +532,7 @@ class PaletteComparison:
         self.method = method
 
         if len(self.query.palette_Lab) != len(self.reference.palette_Lab):
-            raise Exception
+            raise Exception("The number of colors are different between the query and reference palettes.")
 
         self.pairwise_score = None
 
@@ -286,7 +540,47 @@ class PaletteComparison:
         self.pink_dE = None
         self.purple_dE = None
 
+    def save(self, output_dir: str):
+        """Save metric to disk.
+
+        Args:
+            output_dir: Folder path to output the metric to.
+        """
+
+        json_output_path = os.path.join(output_dir, "palette_comparison.json")
+        with open(json_output_path, "w") as file:
+            json.dump({
+                "reference": self.reference.identifier,
+                "query": self.query.identifier,
+                "method": self.method,
+                "pairwise_score": self.pairwise_score,
+                "pink_dE": self.pink_dE,
+                "purple_dE": self.purple_dE,
+            }, file)
+
+    @classmethod
+    def load(cls, input_dir: str) -> PaletteComparison:
+        """Load metric from disk.
+
+        Args:
+            input_dir: Folder path to load the metric from.
+
+        Returns:
+            A PaletteComparison.
+        """
+
+        json_input_path = os.path.join(input_dir, "palette_comparison.json")
+        with open(json_input_path, "r") as file:
+            json_data = json.load(file)
+
+        pc = cls(json_data["reference"], json_data["query"])
+        pc.dist = json_data["dist"]
+
+        return pc
+
     def pairwise(self):
+        """Compute a pairwise comparison between the query and reference palettes.
+        """
 
         num_colors = len(self.query.palette_Lab)
         prods = list(itertools.product(list(range(num_colors)), list(range(num_colors))))
@@ -302,7 +596,21 @@ class PaletteComparison:
 
         self.pairwise_score = statistics.mean(min_dEs)
 
-    def get_val(self, val_type):
+    def get_val(self, val_type: str) -> float:
+        """Get a metric/statistic.
+
+        Options for ``val_type``:
+            * "compare": Pairwise comparison, independent of the stain type.
+            * "Hdiv": Hematoxylin diversity.
+            * "Ediv": Eosin diversity.
+            * "HEsep": Hematoxylin and eosin separability.
+
+        Args:
+            val_type: The name of the metric/statistic to get.
+
+        Returns:
+            The requested metric/statistic.
+        """
         if val_type == "compare":
             return self.pairwise_score
         elif val_type == "Hdiv":
@@ -312,9 +620,11 @@ class PaletteComparison:
         elif val_type == "HEsep":
             return self.query.pink_purple_separation
         else:
-            raise Exception
+            raise Exception(f"{val_type} is not a valid metric.")
 
     def dominant_he(self):
+        """Compute the difference between the query and reference palettes by comparing their dominant pink color with each other and their dominant purple color with each other.
+        """
 
         purple_0_idx = self.query.purples_idx[0]
         purple_1_idx = self.reference.purples_idx[1]
@@ -326,10 +636,13 @@ class PaletteComparison:
         self.purple_dE = colour.delta_E(self.query.palette_Lab[purple_0_idx], self.reference.palette_Lab[purple_1_idx])
 
     def compute(self):
+        """Compute the PaletteComparison.
+        """
 
         if self.method == "pairwise":
             self.pairwise()
         elif self.method == "dominant_he":
             self.dominant_he()
         else:
-            raise Exception
+            raise Exception(f"{self.method} is not a valid method for computing the PaletteComparison.")
+            
