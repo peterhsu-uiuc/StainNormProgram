@@ -23,7 +23,7 @@ Getting Started
    pip install stainnormprogram
 
 
-To learn how to use StainNormProgram, check out the `tutorials/ <https://github.com/peterhsu-uiuc/StainNormProgram/tree/main/tutorials>`_ folder.
+**To learn how to use StainNormProgram, check out the `tutorials/ <https://github.com/peterhsu-uiuc/StainNormProgram/tree/main/tutorials>`_ folder.**
 
 For more details on each function, please see the API Reference.
 
