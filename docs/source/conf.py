@@ -48,5 +48,10 @@ html_theme_options = {
             "url": "https://github.com/peterhsu-uiuc/StainNormProgram",
             "icon": "fa-brands fa-github",
         }
-    ]
+    ],
+    "switcher": {
+        "json_url": "https://stainnormprogram.readthedocs.io/en/latest/_static/switcher.json",
+        "version_match": "1.0.0",
+    },
+    "navbar_start": ["navbar-logo", "version-switcher"],
 }
