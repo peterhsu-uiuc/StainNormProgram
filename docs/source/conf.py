@@ -54,4 +54,8 @@ html_theme_options = {
         "version_match": "1.0.0",
     },
     "navbar_start": ["navbar-logo", "version-switcher"],
+    "logo": {
+        "text": "StainNormProgram",
+        "link": "https://stainnormprogram.readthedocs.io/en/latest/",
+    }
 }
