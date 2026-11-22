@@ -25,7 +25,7 @@ exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
 html_theme = "pydata_sphinx_theme"
-html_static_path = ['_static']
+html_static_path = ['../_static']
 
 # -- AutoAPI -----------------------------------------------------------------
 autoapi_dirs = ["../../src/stainnormprogram"]
@@ -53,5 +53,5 @@ html_theme_options = {
         "json_url": "https://stainnormprogram.readthedocs.io/en/latest/_static/switcher.json",
         "version_match": "1.0.0",
     },
-    "navbar_start": ["navbar-logo", "version-switcher"],
+    "navbar_start": ["version-switcher"],
 }
