@@ -53,5 +53,5 @@ html_theme_options = {
         "json_url": "https://stainnormprogram.readthedocs.io/en/latest/_static/switcher.json",
         "version_match": "1.0.0",
     },
-    "navbar_start": ["version-switcher"],
+    "navbar_start": ["navbar-logo", "version-switcher"],
 }
