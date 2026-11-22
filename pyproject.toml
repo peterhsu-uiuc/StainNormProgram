@@ -4,11 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "stainnormprogram"
+version = "1.0.0"
 dynamic = ["version"]
 description = 'A program that does stain normalization.'
 readme = "README.md"
 requires-python = ">=3.8"
-license = "MIT"
+license = "Apache-2.0"
 keywords = []
 authors = [
   { name = "peterhsu-uiuc", email = "pwhsu2@illinois.edu" },
@@ -21,6 +22,9 @@ classifiers = [
   "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Python :: 3.15",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Python :: Implementation :: PyPy",
 ]
