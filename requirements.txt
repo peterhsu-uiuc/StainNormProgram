@@ -14,3 +14,5 @@ bioio-bioformats
 imagecodecs
 scipy
 plotly
+bitarray
+fast_colorthief
