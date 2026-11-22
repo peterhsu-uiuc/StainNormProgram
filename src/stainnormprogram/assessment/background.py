@@ -1,4 +1,4 @@
-from stainnormprogram.slide import SlideImage
+from stainnormprogram.slide import SlideImage, SlideImageCollection
 from stainnormprogram.norm.background import HSVBackgroundEstimation
 
 import os
@@ -8,7 +8,7 @@ import numpy as np
 
 class BackgroundEstimation:
 
-    def __init__(self, slide: SlideImage, method: str = "hsv_threshold", identifier: str | None = None):
+    def __init__(self, slide: SlideImage | SlideImageCollection, method: str = "hsv_threshold", identifier: str | None = None):
         """Estimate the background color for the assessment.
 
         Options for ``method``:
