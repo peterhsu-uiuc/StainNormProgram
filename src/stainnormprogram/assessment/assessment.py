@@ -691,7 +691,7 @@ class Assessment:
                         cc.compute()
                         other_version.save_stat(cc, key)
 
-    def create_traces(self, stat_type: str, plot_type: str) -> dict[str | None, list[tuple[str, str, float]]]:
+    def create_traces(self, stat_type: str, plot_type: str) -> dict[str | None, list[tuple[str, str, float | tuple[float, float]]]]:
         """Create traces for graphing.
 
         Args:
@@ -699,7 +699,7 @@ class Assessment:
             plot_type: Plot name (within the statistic).
 
         Returns:
-            Traces as a dictionary with each key being a version (one trace) and value being a list of data points. Each data point is a tuple consisting of (identifier, group, value).
+            Traces as a dictionary with each key being a version (one trace) and value being a list of data points. Each data point is a tuple consisting of (identifier, group, value). Value can be a float or a tuple of two floats (mean, std).
         """
 
         traces = {}
