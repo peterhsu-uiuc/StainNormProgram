@@ -982,6 +982,8 @@ class BioformatsImage:
         self.adjustment = None
         self.resolution = [None, None]
 
+        print("WARNING: Using Bioformats to read the image. We do not support parallel compute with this reader yet.")
+
     def get_tile(self, y: int, x: int, height: int, width: int) -> Tile:
         """Get tile.
 
