@@ -62,6 +62,9 @@ class ColorHistogramEdges:
     def __eq__(self, other: ColorHistogramEdges) -> bool:
         """Compare the equality between this and other ColorHistogramEdges objects.
 
+        Args:
+            other: The other ColorHistogramEdges object to compare with.
+
         Returns:
             A bool indicating whether the two objects have the same edges or not.
         """
