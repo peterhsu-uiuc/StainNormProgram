@@ -1,5 +1,3 @@
-from stainnormprogram.norm.adjustments import Adjustment
-
 import os
 import random
 import math
@@ -19,6 +17,8 @@ import pyvips
 from PIL import Image
 from bioio import BioImage
 import bioio_bioformats
+
+from stainnormprogram.norm.adjustments import Adjustment
 
 class Tile:
 
@@ -741,7 +741,7 @@ class SlideImage:
             slide = OpenSlideImage(path)
             return slide, "openslide"
         except Exception:
-            pass
+            raise
 
         try:
             if not is_valid_extension(path, reader="tifffile"):
