@@ -741,7 +741,7 @@ class SlideImage:
             slide = OpenSlideImage(path)
             return slide, "openslide"
         except Exception:
-            raise
+            pass
 
         try:
             if not is_valid_extension(path, reader="tifffile"):
