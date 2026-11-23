@@ -917,7 +917,48 @@ class TifffileZarrImage:
             raise Exception("Could not find the color dimension.")
         self.shape = self.data.shape[1:] if self.color_dim == 0 else self.data.shape[:-1]
         self.adjustment = None
-        self.resolution = [None, None]
+        self.resolution = self._guess_resolution(path)
+
+    def _guess_resolution(self, path) -> list[float] | list[None]:
+        """Guess the resolution of the TIFF image.
+
+        Args:
+            path: Path to the TIFF image.
+
+        Returns:
+            A list of the x and y resolutions in microns per pixel, or [None, None] if it cannot be guessed.
+        """
+        try:
+            mpp_x = None
+            mpp_y = None
+            
+            highest_res_page_idx = 0
+            largest_h = 0
+            with tifffile.TiffFile(path) as tif:
+                for idx, page in enumerate(tif.pages):
+                    h, w = page.shape[0], page.shape[1]
+                    if h > largest_h:
+                        largest_h = h
+                        highest_res_page_idx = idx
+
+                highest_res_page = tif.pages[highest_res_page_idx]
+                XResolution = float(highest_res_page.tags["XResolution"].value[0]) / float(highest_res_page.tags["XResolution"].value[1])
+                YResolution = float(highest_res_page.tags["YResolution"].value[0]) / float(highest_res_page.tags["YResolution"].value[1])
+
+                if XResolution <= 0 or YResolution <= 0:
+                    raise Exception("Invalid XResolution or YResolution.")
+
+                if highest_res_page.tags["ResolutionUnit"].value == 3: # CENTIMETER
+                    mpp_x = 1. / XResolution * 1e4
+                    mpp_y = 1. / YResolution * 1e4
+                elif highest_res_page.tags["ResolutionUnit"].value == 2: # INCHES
+                    mpp_x = 1. / XResolution * 25400
+                    mpp_y = 1. / YResolution * 25400
+
+            return [mpp_x, mpp_y]
+
+        except:
+            return [None, None]
 
     def get_tile(self, y: int, x: int, height: int, width: int) -> Tile:
         """Get tile.
