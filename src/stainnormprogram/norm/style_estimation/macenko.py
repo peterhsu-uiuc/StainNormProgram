@@ -28,6 +28,7 @@ class MacenkoStyleEstimation:
                 alpha: float = 1.0,
                 beta: float = 0.15,
                 use_nnls: bool = True,
+                maxworkers: int | None = None,
                 options: dict[str, Any] = {}
                 ):
         """Estimate the stain style using Macenko's method.
@@ -40,6 +41,7 @@ class MacenkoStyleEstimation:
             alpha: Macenko's alpha.
             beta: Macenko's beta.
             use_nnls: Use non-negative least squares when calculating concentrations.
+            maxworkers: Max workers for style estimation (None calculates this for you).
             options: Additional options to pass to the estimation methods.
         """
         self.slide = slide
@@ -49,6 +51,7 @@ class MacenkoStyleEstimation:
         self.alpha = alpha
         self.beta = beta
         self.use_nnls = use_nnls
+        self.maxworkers = maxworkers
         self.options = options
         
         if "tiled" in self.mode and "threshold" not in options:
@@ -363,7 +366,11 @@ class MacenkoStyleEstimation:
         self.slide.set_tile_size(tile_size)
 
         # Set number of workers based on CPU cores
-        num_workers = max(1, (os.cpu_count() or 1) - 1)
+        num_workers = 1
+        if self.maxworkers is None:
+            num_workers = max(1, (os.process_cpu_count() or 1) - 1)
+        else:
+            num_workers = self.maxworkers
         print(f"Using {num_workers} workers...")
 
         # Get coordinates to visit

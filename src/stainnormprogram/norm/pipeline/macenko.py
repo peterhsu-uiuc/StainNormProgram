@@ -41,7 +41,7 @@ class MacenkoPipeline(Pipeline):
             alpha: Macenko's alpha.
             beta: Macenko's beta.
             use_nnls: Use non-negative least squares for concentration estimations.
-            maxworkers: Max workers for file saving (None calculates this for you).
+            maxworkers: Max workers for style estimation and file saving (None calculates this for you).
             compression: Compression method for file saving (None, "zlib", or "jpeg").
         """
         super().__init__()
@@ -93,6 +93,7 @@ class MacenkoPipeline(Pipeline):
                                      alpha=self.alpha,
                                      beta=self.beta,
                                      use_nnls=self.use_nnls,
+                                     maxworkers=self.maxworkers,
                                      options=self.style_est_options,
                                     )
         mse.compute_matrix()

@@ -47,7 +47,7 @@ class TiledWriter:
         self.maxworkers = maxworkers
 
         if self.maxworkers is None:
-            self.maxworkers = max(1, (os.cpu_count() or 1) - 1)
+            self.maxworkers = max(1, (os.process_cpu_count() or 1) - 1)
         print(f"Max workers for writing = {self.maxworkers}")
 
         if len(self.shape) == 2:
