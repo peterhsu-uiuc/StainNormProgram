@@ -24,10 +24,28 @@ classifiers = [
   "Programming Language :: Python :: 3.13",
   "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: 3.15",
-  "Programming Language :: Python :: Implementation :: CPython",
-  "Programming Language :: Python :: Implementation :: PyPy",
 ]
-dependencies = []
+dependencies = [
+  "tifffile==2026.6.1",
+  "numpy",
+  "pyvips[binary]",
+  "scikit-learn",
+  "scikit-image",
+  "colour-science",
+  "zarr",
+  "fastdigest",
+  "openslide-python",
+  "openslide-bin",
+  "Pillow",
+  "bioio",
+  "bioio-bioformats",
+  "imagecodecs",
+  "scipy",
+  "plotly",
+  "bitarray",
+  "fast_colorthief",
+  "matplotlib",
+]
 
 [project.urls]
 Documentation = "https://github.com/peterhsu-uiuc/StainNormProgram#readme"

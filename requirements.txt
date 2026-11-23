@@ -16,3 +16,4 @@ scipy
 plotly
 bitarray
 fast_colorthief
+matplotlib
