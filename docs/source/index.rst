@@ -18,6 +18,8 @@ StainNormProgram provides the utilities needed to perform stain normalization on
 Getting Started
 ------------------------------
 
+Supported Python version: 3.14
+
 .. code-block:: bash
    
    pip install stainnormprogram
